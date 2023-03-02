@@ -1,0 +1,48 @@
+echo "# SampleTokenizedDepositCordaDLT" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/iantstaley/SampleTokenizedDepositCordaDLT.git
+git push -u origin main
+// Import necessary Corda libraries
+import net.corda.core.contracts.Amount
+import net.corda.core.identity.Party
+import net.corda.core.transactions.SignedTransaction
+import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.utilities.OpaqueBytes
+import net.corda.finance.contracts.asset.Cash
+import net.corda.finance.contracts.asset.Cash.Commands.Move
+import net.corda.finance.schemas.CashSchemaV1
+
+// Define the function to create a tokenized deposit
+fun createTokenizedDeposit(depositAmount: Amount<Currency>,
+                           depositRecipient: Party): SignedTransaction {
+
+    // Get the notary for the transaction
+    val notary = serviceHub.networkMapCache.notaryIdentities.first()
+
+    // Generate a random byte array as the unique identifier for the transaction
+    val bytes = OpaqueBytes.of(0x01)
+
+    // Create a new transaction builder
+    val txBuilder = TransactionBuilder(notary)
+
+    // Generate the output state representing the deposited token
+    val depositOutputState = Cash.State(depositAmount, depositRecipient)
+
+    // Add the output state to the transaction builder
+    txBuilder.addOutputState(depositOutputState, Cash.PROGRAM_ID)
+
+    // Add the move command to the transaction builder
+    val signers = listOf(ourIdentity.owningKey)
+    txBuilder.addCommand(Move(), signers)
+
+    // Sign and finalize the transaction
+    val partiallySignedTx = serviceHub.signInitialTransaction(txBuilder)
+    val fullySignedTx = subFlow(CollectSignaturesFlow(partiallySignedTx, signers))
+    val stx = subFlow(FinalityFlow(fullySignedTx))
+
+    // Return the signed transaction
+    return stx
+}
